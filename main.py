@@ -16,4 +16,4 @@ app.include_router(partners_info)
 app.include_router(register_partner)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="213.171.10.9", port=2354)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

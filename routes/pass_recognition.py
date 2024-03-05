@@ -1,13 +1,15 @@
 import os
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from datetime import datetime
 import shutil
+from typing import Any, Dict, AnyStr, List, Union
 
 from configs.decoder import decode_text
 from db.insert_data import insert_to_pass_recognition
     
 app = APIRouter()
+JSONObject = Dict[AnyStr, Any]
 
 
 def rewrite_counter(counter_text, type):
@@ -32,22 +34,36 @@ def copy_and_rename_db_file(src_path, dest_folder, new_filename):
 
 
 class Pass(BaseModel):
-    name: str = None
-    
-    type: str = "None"
-    img_size: str = None
-    weight_img: str = None
-    format_img: str = None
-    special_id: str = None
-    find_pass: str = None
-    pass_num: str = None
-    time: str = None
+    name: str
+        
+    type: str
+    img_size: str
+    weight_img: str
+    format_img: str
+    special_id: str
+    find_pass: str
+    pass_num: str
+    time: str
+
+
+class DataModel(BaseModel):
+    name: str
+    type: str
+    img_size: str  # Parse as a list of integers
+    weight_img: float
+    special_id: str
+    pass_num: str
+    format_img: str
+    find_pass: bool
+    time: int
+    date: int
 
 
 @app.post("/exe")
-def pass_recognition(item: Pass):
-    
-    encode_name_bank = item.name
+async def pass_recognition(data: JSONObject = None):
+
+    encode_name_bank = data["name"]
+    print(encode_name_bank)
     try:
         decode_name_bank = decode_text(encode_name_bank)
     except:
@@ -77,32 +93,31 @@ def pass_recognition(item: Pass):
     with open(f"requests/{decode_name_bank}/counter.txt", 'r') as f1:
         counter = f1.read()
         
-    if access==0:
-        return {"error": "Access Danied!"}
-    else:
-        model = item.type
-        img_size = item.img_size
-        weight_img = item.weight_img
-        format_img = item.format_img
-        special_id = item.special_id
-        find_pass = item.find_pass
-        pass_num = item.pass_num
-        time = item.time
-        
-        date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        try:
-            re_counter = rewrite_counter(counter, model)
-        except:
-            return {"error": "You forget send 'type'. Example: {'type': 'front' or 'back'}"}
-        with open(f"requests/{decode_name_bank}/counter.txt", 'w') as f1:
-            f1.write(counter.replace(f"{model}:" + str(re_counter), f"{model}:" + str(re_counter+1)))
+
+    model = data["type"]
+    img_size = data["img_size"]
+    weight_img = data["weight_img"]
+    special_id = data["special_id"]
+    pass_num = data["pass_num"]
+    format_img = data["format_img"]
+    find_pass = data["find_pass"]
+    time = data["time"]
+    
+    
+    date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        re_counter = rewrite_counter(counter, model)
+    except:
+        return {"error": "You forget send 'type'. Example: {'type': 'front' or 'back'}"}
+    with open(f"requests/{decode_name_bank}/counter.txt", 'w') as f1:
+        f1.write(counter.replace(f"{model}:" + str(re_counter), f"{model}:" + str(re_counter+1)))
 
 
-        db_name = f"requests/{decode_name_bank}/{decode_name_bank}.db"
+    db_name = f"requests/{decode_name_bank}/{decode_name_bank}.db"
 
-        insert_to_pass_recognition(db_name, re_counter+1, model, img_size, weight_img, format_img, special_id, find_pass, pass_num, time, date)
-        
+    insert_to_pass_recognition(db_name, re_counter+1, model, img_size, weight_img, format_img, special_id, find_pass, pass_num, time, date)
+    
         
         
         
@@ -110,6 +125,7 @@ def pass_recognition(item: Pass):
     final_data = {
         "name_bank": decode_name_bank, 
         "access": access, 
+        "error": "Access Danied!",
         "counter": re_counter+1, 
         "model": model,
         "img_size": img_size,
